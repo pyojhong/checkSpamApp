@@ -1,14 +1,31 @@
-import { Platform, Alert, StyleSheet, View, Text, TextInput, ScrollView, Pressable, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { Modal, Platform, Alert, StyleSheet, View, Text, TextInput, ScrollView, Pressable, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useState, useEffect} from 'react';
+import { opacity } from 'react-native-reanimated/lib/typescript/Colors';
 
 const API_KEY = process.env.EXPO_PUBLIC_SPAM_API;
 const API_URL = process.env.EXPO_PUBLIC_SPAM_URL;
 
-export default function HomeScreen() {
-  const [phoneNumberHistory, setPhoneNumberHistory] = useState([]);
+interface HistoryItem {
+  id: number;
+  phone_number: string;
+  phone_carrier: string;
+  phone_country: string;
+  phone_region: string;
+  phone_city: string;
+  phone_messaging: string;
+  phone_registration: string;
+  phone_risk: string;
+  isSpam: boolean;
+  rawData: any;
+}
 
+
+export default function HomeScreen() {
+  const [phoneNumberHistory, setPhoneNumberHistory] = useState<HistoryItem[]>([]);
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const storeData = async (value) => {
     try {
@@ -57,6 +74,7 @@ export default function HomeScreen() {
         phone_registration: data.phone_registration?.name || '정보 없음', 
         phone_risk: data.phone_risk?.risk_level || 'low',
         isSpam: data.phone_risk?.risk_level === 'high' || data.phone_risk?.risk_level === 'very_high',
+        rawData: data,
       };
       setPhoneNumberHistory((prev) => [record, ...prev]);
       storeData([record, ...phoneNumberHistory]);
@@ -80,6 +98,17 @@ export default function HomeScreen() {
       console.log('검색 에러', error);
     }
   };
+
+  const deleteNumber = async (id: number) => {
+    try {
+      const updatedHistory = phoneNumberHistory.filter((item) => item.id !== id);
+      setPhoneNumberHistory(updatedHistory);
+      await AsyncStorage.setItem('@numbers', JSON.stringify(updatedHistory));
+    } catch (error) {
+      console.log('삭제 에러', error);
+    }
+  };
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
@@ -92,10 +121,13 @@ export default function HomeScreen() {
             <ScrollView>
               {phoneNumberHistory.length > 0 ? (
                 phoneNumberHistory.map((item) => (
-                  <View key={item.id} style={{flexDirection: 'row'}}>
+                  <Pressable key={item.id} style={({pressed}) => pressed ? [{flexDirection: 'row', opacity: 0.5}] : {flexDirection: 'row'}} onPress={() => {
+                    setSelectedItem(item);
+                    setModalVisible(true);
+                  }}>
                     <Text style={styles.subText}>{item.phone_number}</Text>
                     <Text style={[styles.resultText, item.isSpam ? {color: ORANGE} : {color: 'white'}]}>{item.isSpam ? '스팸 위험' : '정상'}</Text>
-                  </View>
+                  </Pressable>
                 ))) : null}
             </ScrollView>
           </View>
@@ -103,12 +135,33 @@ export default function HomeScreen() {
             <Text style={styles.text}>검색</Text>
             <View style={{flexDirection: 'row'}}>
               <TextInput onChangeText={setPhoneNumber} value={phoneNumber} style={styles.textInput} keyboardType='numeric' placeholder='전화번호 입력'></TextInput>
-              <Pressable onPress={searchPhoneNumber}>
-                <Text style={styles.button}>조회</Text>
+              <Pressable onPress={searchPhoneNumber} style={({pressed}) => pressed ? [styles.button, {opacity: 0.5}] : styles.button}>
+                <Text style={styles.buttonText}>조회</Text>
               </Pressable>
             </View>
           </View>
         </View>
+
+      <Modal visible={modalVisible} animationType='slide' transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ScrollView>
+                <Text style={{color: 'white'}}>{JSON.stringify(selectedItem?.rawData, null, 2)}</Text>
+            </ScrollView>
+            <Pressable onPress={() => setModalVisible(false)} style={({pressed}) => pressed ? [styles.modalButton, {opacity: 0.5}] : styles.modalButton}>
+              <Text style={{color: 'white', fontWeight: '500'}}>닫기</Text>
+            </Pressable>
+            <Pressable onPress={() => {
+              if (selectedItem) {
+                deleteNumber(selectedItem.id);
+                setModalVisible(false);
+              }
+            }} style={({pressed}) => pressed ? [styles.modalButton, {opacity: 0.5}] : styles.modalButton}>
+              <Text style={{color: 'white', fontWeight: '500'}}>삭제</Text>
+            </Pressable>
+          </View>
+        </View>
+    </Modal>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -172,11 +225,35 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: ORANGE,
     borderRadius: 20,
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '800',
     paddingVertical: 15,
     paddingHorizontal: 15,
     marginTop: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '800'
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '80%',
+    maxHeight: '60%',
+    backgroundColor: '#222',
+    padding: 20,
+    borderRadius: 15,
+  },
+  modalButton: {
+    marginTop: 15,
+    backgroundColor: ORANGE,
+    padding: 10,
+    borderRadius: 10,
+    alignItems: 'center',
   },
 });
