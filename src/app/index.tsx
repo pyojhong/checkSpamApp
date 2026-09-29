@@ -1,7 +1,6 @@
 import { Modal, Platform, Alert, StyleSheet, View, Text, TextInput, ScrollView, Pressable, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useState, useEffect} from 'react';
-import { opacity } from 'react-native-reanimated/lib/typescript/Colors';
 
 const API_KEY = process.env.EXPO_PUBLIC_SPAM_API;
 const API_URL = process.env.EXPO_PUBLIC_SPAM_URL;
@@ -76,8 +75,9 @@ export default function HomeScreen() {
         isSpam: data.phone_risk?.risk_level === 'high' || data.phone_risk?.risk_level === 'very_high',
         rawData: data,
       };
-      setPhoneNumberHistory((prev) => [record, ...prev]);
-      storeData([record, ...phoneNumberHistory]);
+      const updatedHistory = [record, ...phoneNumberHistory];
+      setPhoneNumberHistory(updatedHistory);
+      storeData(updatedHistory);
       setPhoneNumber('');
     } catch (error) {
       console.log('API 에러', error);
@@ -145,10 +145,37 @@ export default function HomeScreen() {
       <Modal visible={modalVisible} animationType='slide' transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <Text style={styles.modalText}>상세 정보</Text>
             <ScrollView>
-                <Text style={{color: 'white'}}>{JSON.stringify(selectedItem?.rawData, null, 2)}</Text>
+                {selectedItem ? (
+                  <View>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.infoLabel}>전화번호</Text>
+                      <Text style={styles.infoValue}>{selectedItem.phone_number}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.infoLabel}>스팸 여부</Text>
+                      <Text style={[styles.infoValue, selectedItem.isSpam ? {color: ORANGE} : {color: 'white'}]}>{selectedItem.isSpam ? '스팸 위험' : '정상 번호'}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.infoLabel}>통신사 / 등록자</Text>
+                      <Text style={styles.infoValue}>{selectedItem.phone_carrier}</Text>
+                      <Text style={styles.infoValue}>{selectedItem.phone_registration}</Text>
+                      <Text style={styles.infoValue}>{selectedItem.phone_messaging}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.infoLabel}>국가 / 지역</Text>
+                      <Text style={styles.infoValue}>{selectedItem.phone_country}</Text>
+                      <Text style={styles.infoValue}>{selectedItem.phone_region}</Text>
+                      <Text style={styles.infoValue}>{selectedItem.phone_city}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.infoLabel}>위험도</Text>
+                      <Text style={styles.infoValue}>{selectedItem.phone_risk}</Text>
+                    </View>
+                  </View>) : null}
             </ScrollView>
-            <Pressable onPress={() => setModalVisible(false)} style={({pressed}) => pressed ? [styles.modalButton, {opacity: 0.5}] : styles.modalButton}>
+            <Pressable onPress={() => setModalVisible(false)} style={({pressed}) => pressed ? [styles.modalCloseButton, {opacity: 0.5}] : styles.modalCloseButton}>
               <Text style={{color: 'white', fontWeight: '500'}}>닫기</Text>
             </Pressable>
             <Pressable onPress={() => {
@@ -255,5 +282,38 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
     alignItems: 'center',
+  },
+    modalCloseButton: {
+    marginTop: 15,
+    backgroundColor: '#555',
+    padding: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  modalText: {
+    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  infoRow: {
+    paddingVertical: 6,
+    justifyContent: 'space-between',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#444',
+  },
+  infoLabel: {
+    color: '#aaa',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  infoValue: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '500',
+    textAlign: 'right',
+    paddingHorizontal: 6,
+    paddingVertical: 5,
   },
 });
